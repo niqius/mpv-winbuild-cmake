@@ -101,11 +101,37 @@ jobs:
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 ${{ env.gcc_arch }} -DSINGLE_SOURCE_LOCATION=$PWD/src_packages -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup -DENABLE_CCACHE=ON --fresh -G Ninja -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
 
-      - name: Applying EXIF lenient patch to ffmpeg
+      - name: Ensuring ffmpeg source and applying EXIF lenient patch
         run: |
-          ls -la src_packages/ffmpeg/libavcodec/pngdec.c
-          patch -d src_packages/ffmpeg -p1 -N --fuzz=3 < "$GITHUB_WORKSPACE/patch/ffmpeg-exif-warning.patch" || true
-          grep -n "ignoring invalid EXIF data" src_packages/ffmpeg/libavcodec/pngdec.c
+          # The toolchain cache may restore download stamps while src_packages (not cached) is empty.
+          # If the ffmpeg source is missing, wipe package stamps and force a real download.
+          if [ ! -f src_packages/ffmpeg/libavcodec/pngdec.c ]; then
+            echo "Package sources missing - forcing re-download"
+            find build_$BIT/packages -type d -name '*-stamp' -exec rm -rf {} + 2>/dev/null || true
+            ninja -C build_$BIT download || true
+          fi
+          # Last-resort fallback: clone ffmpeg directly if download still left it missing
+          if [ ! -f src_packages/ffmpeg/libavcodec/pngdec.c ]; then
+            echo "ffmpeg source still missing - cloning directly"
+            rm -rf src_packages/ffmpeg
+            git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git src_packages/ffmpeg
+          fi
+          # Locate the patch file in the repo
+          PATCH_FILE=""
+          for cand in "$PWD/patch/ffmpeg-exif-warning.patch" "$GITHUB_WORKSPACE/patch/ffmpeg-exif-warning.patch"; do
+            if [ -f "$cand" ]; then PATCH_FILE="$cand"; break; fi
+          done
+          if [ -z "$PATCH_FILE" ]; then
+            echo "::error::ffmpeg-exif-warning.patch not found. Expected at patch/ffmpeg-exif-warning.patch in the repo root."
+            exit 1
+          fi
+          patch -d src_packages/ffmpeg -p1 -N --fuzz=3 < "$PATCH_FILE" || true
+          if grep -q "ignoring invalid EXIF data" src_packages/ffmpeg/libavcodec/pngdec.c; then
+            echo "EXIF lenient patch applied successfully"
+          else
+            echo "::error::EXIF patch did not apply (ffmpeg source may have changed)."
+            exit 1
+          fi
 
       - name: Building toolchain
         run: |
