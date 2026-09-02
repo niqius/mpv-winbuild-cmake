@@ -1,0 +1,16 @@
+diff --git a/libavcodec/pngdec.c b/libavcodec/pngdec.c
+--- a/libavcodec/pngdec.c
++++ b/libavcodec/pngdec.c
+@@ -1741,10 +1741,10 @@ static int decode_frame_common(AVCodecContext *avctx, PNGDecContext *s,
+     if (s->exif_data) {
+         // we swap because ff_decode_exif_attach_buffer adds to p->metadata
+         FFSWAP(AVDictionary *, p->metadata, s->frame_metadata);
+         ret = ff_decode_exif_attach_buffer(avctx, p, &s->exif_data, AV_EXIF_TIFF_HEADER);
+         FFSWAP(AVDictionary *, p->metadata, s->frame_metadata);
+         if (ret < 0) {
+-            av_log(avctx, AV_LOG_WARNING, "unable to attach EXIF buffer\n");
+-            return ret;
++            av_log(avctx, AV_LOG_WARNING, "ignoring invalid EXIF data\n");
++            av_buffer_unref(&s->exif_data);
+         }
+     }
