@@ -116,13 +116,13 @@ jobs:
             rm -rf src_packages/ffmpeg
             git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git src_packages/ffmpeg
           fi
-          # Locate the patch file in the repo
+          # Locate the patch file (repo root or patch/ subdirectory)
           PATCH_FILE=""
-          for cand in "$PWD/patch/ffmpeg-exif-warning.patch" "$GITHUB_WORKSPACE/patch/ffmpeg-exif-warning.patch"; do
+          for cand in "$PWD/ffmpeg-exif-warning.patch" "$PWD/patch/ffmpeg-exif-warning.patch" "$GITHUB_WORKSPACE/ffmpeg-exif-warning.patch" "$GITHUB_WORKSPACE/patch/ffmpeg-exif-warning.patch"; do
             if [ -f "$cand" ]; then PATCH_FILE="$cand"; break; fi
           done
           if [ -z "$PATCH_FILE" ]; then
-            echo "::error::ffmpeg-exif-warning.patch not found. Expected at patch/ffmpeg-exif-warning.patch in the repo root."
+            echo "::error::ffmpeg-exif-warning.patch not found. Expected in repo root or at patch/ffmpeg-exif-warning.patch."
             exit 1
           fi
           patch -d src_packages/ffmpeg -p1 -N --fuzz=3 < "$PATCH_FILE" || true
